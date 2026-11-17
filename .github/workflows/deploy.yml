@@ -1,4 +1,4 @@
-name: Build ELARB FitPro Ultra APK & PWA
+name: Build and Release ELARB FitPro Ultra PWA
 
 on:
   push:
@@ -7,7 +7,7 @@ on:
     branches: [ main, master ]
 
 jobs:
-  build-apk:
+  build:
     runs-on: ubuntu-latest
 
     steps:
@@ -20,31 +20,14 @@ jobs:
         node-version: 20
         cache: 'npm'
 
-    - name: Set up JDK 17
-      uses: actions/setup-java@v4
-      with:
-        distribution: 'temurin'
-        java-version: '17'
-
     - name: Install Dependencies
       run: npm install --legacy-peer-deps
 
-    - name: Build Web App
+    - name: Build Application
       run: npm run build
 
-    - name: Initialize Capacitor Android Project
-      run: |
-        npx cap init "ELARB FitPro Ultra" "com.elarb.fitpro.ultra" --web-dir dist --yes
-        npx cap add android
-
-    - name: Build Android APK with Gradle
-      run: |
-        cd android
-        chmod +x gradlew
-        ./gradlew assembleDebug
-
-    - name: Upload APK Artifact
+    - name: Upload Production Build Artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: elarb-fitpro-apk
-        path: android/app/build/outputs/apk/debug/app-debug.apk
+        name: elarb-fitpro-dist
+        path: dist/
