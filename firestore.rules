@@ -1,0 +1,378 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Pillar 4.1: Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Primitive Helpers
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerified() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isOwner(uid) {
+      return isVerified() && request.auth.uid == uid;
+    }
+
+    // Zero-read email bootstrap check safe for list rules
+    function isPrimaryAdminEmail() {
+      return isVerified() && request.auth.token.email == 'elarbvip@gmail.com';
+    }
+
+    function isAdmin() {
+      return isPrimaryAdminEmail() || (
+        isVerified() && exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
+    }
+
+    // Validation Blueprints
+    function isValidUserProfile(data) {
+      return data.keys().hasAll([
+          'uid', 'displayName', 'role', 'status', 'goal', 'activityLevel',
+          'targetCalories', 'targetProtein', 'targetCarbs', 'targetFats',
+          'disclaimerAccepted', 'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'uid', 'displayName', 'role', 'status', 'goal', 'activityLevel',
+          'targetCalories', 'targetProtein', 'targetCarbs', 'targetFats',
+          'disclaimerAccepted', 'heightCm', 'weightKg', 'age', 'gender',
+          'onboardingCompleted', 'activeProgramId', 'activeDietId',
+          'createdAt', 'updatedAt'
+        ])
+        && isValidId(data.uid)
+        && data.displayName is string && data.displayName.size() >= 1 && data.displayName.size() <= 80
+        && data.role in ['member', 'coach', 'admin']
+        && data.status in ['active', 'suspended']
+        && data.goal in ['cut', 'maintain', 'bulk']
+        && data.activityLevel in ['sedentary', 'light', 'moderate', 'active', 'athlete']
+        && data.targetCalories is number && data.targetCalories >= 800 && data.targetCalories <= 10000
+        && data.targetProtein is number && data.targetProtein >= 20 && data.targetProtein <= 600
+        && data.targetCarbs is number && data.targetCarbs >= 0 && data.targetCarbs <= 1200
+        && data.targetFats is number && data.targetFats >= 10 && data.targetFats <= 400
+        && data.disclaimerAccepted is bool
+        && (!('heightCm' in data) || (data.heightCm is number && data.heightCm >= 0 && data.heightCm <= 250))
+        && (!('weightKg' in data) || (data.weightKg is number && data.weightKg >= 0 && data.weightKg <= 400))
+        && (!('age' in data) || (data.age is number && data.age >= 10 && data.age <= 100))
+        && (!('gender' in data) || data.gender in ['male', 'female'])
+        && (!('onboardingCompleted' in data) || data.onboardingCompleted is bool)
+        && (!('activeProgramId' in data) || (data.activeProgramId is string && data.activeProgramId.size() <= 64))
+        && (!('activeDietId' in data) || (data.activeDietId is string && data.activeDietId.size() <= 64))
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidUserPrivateInfo(data) {
+      return data.keys().hasAll(['uid', 'email', 'consentVersion', 'updatedAt'])
+        && data.keys().hasOnly(['uid', 'email', 'consentVersion', 'updatedAt'])
+        && isValidId(data.uid)
+        && data.email is string && data.email.size() >= 3 && data.email.size() <= 160
+        && data.consentVersion is string && data.consentVersion.size() >= 1 && data.consentVersion.size() <= 32
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidAdminRecord(data) {
+      return data.keys().hasAll(['uid', 'email', 'grantedBy', 'createdAt'])
+        && data.keys().hasOnly(['uid', 'email', 'grantedBy', 'createdAt'])
+        && isValidId(data.uid)
+        && data.email is string && data.email.size() >= 3 && data.email.size() <= 160
+        && isValidId(data.grantedBy)
+        && data.createdAt is timestamp;
+    }
+
+    function isValidWorkoutLog(data) {
+      return data.keys().hasAll([
+          'id', 'uid', 'exerciseName', 'discipline', 'muscleGroup',
+          'sets', 'reps', 'weightKg', 'durationSec', 'notes', 'loggedDate', 'createdAt'
+        ])
+        && data.keys().hasOnly([
+          'id', 'uid', 'exerciseName', 'discipline', 'muscleGroup',
+          'sets', 'reps', 'weightKg', 'durationSec', 'notes', 'loggedDate', 'createdAt'
+        ])
+        && isValidId(data.id)
+        && isValidId(data.uid)
+        && data.exerciseName is string && data.exerciseName.size() >= 1 && data.exerciseName.size() <= 100
+        && data.discipline in ['Bodybuilding', 'Calisthenics', 'CrossFit', 'HIIT']
+        && data.muscleGroup is string && data.muscleGroup.size() >= 1 && data.muscleGroup.size() <= 40
+        && data.sets is number && data.sets >= 1 && data.sets <= 100
+        && data.reps is number && data.reps >= 1 && data.reps <= 500
+        && data.weightKg is number && data.weightKg >= 0 && data.weightKg <= 1000
+        && data.durationSec is number && data.durationSec >= 0 && data.durationSec <= 86400
+        && data.notes is string && data.notes.size() <= 300
+        && data.loggedDate is string && data.loggedDate.size() >= 8 && data.loggedDate.size() <= 20
+        && data.createdAt is timestamp;
+    }
+
+    function isValidMealLog(data) {
+      return data.keys().hasAll([
+          'id', 'uid', 'name', 'mealType', 'calories',
+          'proteinG', 'carbsG', 'fatsG', 'source', 'loggedDate', 'createdAt'
+        ])
+        && data.keys().hasOnly([
+          'id', 'uid', 'name', 'mealType', 'calories',
+          'proteinG', 'carbsG', 'fatsG', 'source', 'loggedDate', 'createdAt'
+        ])
+        && isValidId(data.id)
+        && isValidId(data.uid)
+        && data.name is string && data.name.size() >= 1 && data.name.size() <= 120
+        && data.mealType in ['Breakfast', 'Lunch', 'Dinner', 'Snack']
+        && data.calories is number && data.calories >= 0 && data.calories <= 10000
+        && data.proteinG is number && data.proteinG >= 0 && data.proteinG <= 1000
+        && data.carbsG is number && data.carbsG >= 0 && data.carbsG <= 1500
+        && data.fatsG is number && data.fatsG >= 0 && data.fatsG <= 1000
+        && data.source in ['ai-scanner', 'manual']
+        && data.loggedDate is string && data.loggedDate.size() >= 8 && data.loggedDate.size() <= 20
+        && data.createdAt is timestamp;
+    }
+
+    function isValidBodyMeasurement(data) {
+      return data.keys().hasAll([
+          'id', 'uid', 'weightKg', 'bodyFatPct', 'waistCm',
+          'chestCm', 'armCm', 'recordedDate', 'createdAt'
+        ])
+        && data.keys().hasOnly([
+          'id', 'uid', 'weightKg', 'bodyFatPct', 'waistCm',
+          'chestCm', 'armCm', 'recordedDate', 'createdAt'
+        ])
+        && isValidId(data.id)
+        && isValidId(data.uid)
+        && data.weightKg is number && data.weightKg >= 20 && data.weightKg <= 400
+        && data.bodyFatPct is number && data.bodyFatPct >= 2 && data.bodyFatPct <= 75
+        && data.waistCm is number && data.waistCm >= 30 && data.waistCm <= 250
+        && data.chestCm is number && data.chestCm >= 40 && data.chestCm <= 250
+        && data.armCm is number && data.armCm >= 15 && data.armCm <= 100
+        && data.recordedDate is string && data.recordedDate.size() >= 8 && data.recordedDate.size() <= 20
+        && data.createdAt is timestamp;
+    }
+
+    function isValidPersonalRecord(data) {
+      return data.keys().hasAll([
+          'id', 'uid', 'exerciseName', 'weightKg', 'reps',
+          'estimated1RmKg', 'achievedDate', 'createdAt'
+        ])
+        && data.keys().hasOnly([
+          'id', 'uid', 'exerciseName', 'weightKg', 'reps',
+          'estimated1RmKg', 'achievedDate', 'createdAt'
+        ])
+        && isValidId(data.id)
+        && isValidId(data.uid)
+        && data.exerciseName is string && data.exerciseName.size() >= 1 && data.exerciseName.size() <= 100
+        && data.weightKg is number && data.weightKg >= 0 && data.weightKg <= 1000
+        && data.reps is number && data.reps >= 1 && data.reps <= 200
+        && data.estimated1RmKg is number && data.estimated1RmKg >= 0 && data.estimated1RmKg <= 1500
+        && data.achievedDate is string && data.achievedDate.size() >= 8 && data.achievedDate.size() <= 20
+        && data.createdAt is timestamp;
+    }
+
+    function isValidCustomExercise(data) {
+      return data.keys().hasAll([
+          'id', 'name', 'nameAr', 'discipline', 'muscleGroup',
+          'equipment', 'instructions', 'createdBy', 'createdAt'
+        ])
+        && data.keys().hasOnly([
+          'id', 'name', 'nameAr', 'discipline', 'muscleGroup',
+          'equipment', 'instructions', 'createdBy', 'createdAt'
+        ])
+        && isValidId(data.id)
+        && data.name is string && data.name.size() >= 2 && data.name.size() <= 100
+        && data.nameAr is string && data.nameAr.size() >= 2 && data.nameAr.size() <= 100
+        && data.discipline in ['Bodybuilding', 'Calisthenics', 'CrossFit', 'HIIT']
+        && data.muscleGroup is string && data.muscleGroup.size() >= 2 && data.muscleGroup.size() <= 40
+        && data.equipment is string && data.equipment.size() >= 2 && data.equipment.size() <= 40
+        && data.instructions is string && data.instructions.size() >= 5 && data.instructions.size() <= 400
+        && isValidId(data.createdBy)
+        && data.createdAt is timestamp;
+    }
+
+    function isValidAuditLog(data) {
+      return data.keys().hasAll(['id', 'actorUid', 'action', 'targetId', 'details', 'createdAt'])
+        && data.keys().hasOnly(['id', 'actorUid', 'action', 'targetId', 'details', 'createdAt'])
+        && isValidId(data.id)
+        && isValidId(data.actorUid)
+        && data.action is string && data.action.size() >= 2 && data.action.size() <= 80
+        && data.targetId is string && data.targetId.size() >= 1 && data.targetId.size() <= 128
+        && data.details is string && data.details.size() <= 300
+        && data.createdAt is timestamp;
+    }
+
+    // Users Collection (Public-safe athlete profiles)
+    match /users/{userId} {
+      allow get: if isValidId(userId) && (isOwner(userId) || isAdmin());
+      allow list: if isPrimaryAdminEmail() || (isVerified() && resource.data.uid == request.auth.uid);
+
+      allow create: if isValidId(userId)
+        && isOwner(userId)
+        && isValidUserProfile(incoming())
+        && incoming().uid == userId
+        && (incoming().role == 'member' || (isPrimaryAdminEmail() && incoming().role == 'admin'))
+        && incoming().status == 'active'
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+
+      allow update: if isValidId(userId)
+        && isValidUserProfile(incoming())
+        && incoming().uid == existing().uid
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          // Action: Owner updates fitness profile & targets (cannot escalate role or status)
+          (
+            isOwner(userId)
+            && incoming().role == existing().role
+            && incoming().status == existing().status
+            && incoming().diff(existing()).affectedKeys().hasOnly([
+              'displayName', 'goal', 'activityLevel',
+              'targetCalories', 'targetProtein', 'targetCarbs', 'targetFats',
+              'disclaimerAccepted', 'heightCm', 'weightKg', 'age', 'gender',
+              'onboardingCompleted', 'activeProgramId', 'activeDietId',
+              'updatedAt'
+            ])
+          )
+          ||
+          // Action: Admin manages user role or account status
+          (
+            isAdmin()
+            && incoming().diff(existing()).affectedKeys().hasOnly(['role', 'status', 'updatedAt'])
+          )
+        );
+
+      allow delete: if isValidId(userId) && (isOwner(userId) || isAdmin());
+
+      // Split Collection: Private PII
+      match /private/{docId} {
+        allow get: if isValidId(userId) && isValidId(docId) && (isOwner(userId) || isAdmin());
+        allow list: if false;
+        allow create: if isValidId(userId)
+          && isValidId(docId)
+          && docId == 'pii'
+          && isOwner(userId)
+          && isValidUserPrivateInfo(incoming())
+          && incoming().uid == userId
+          && incoming().updatedAt == request.time;
+        allow update: if isValidId(userId)
+          && isValidId(docId)
+          && docId == 'pii'
+          && isOwner(userId)
+          && isValidUserPrivateInfo(incoming())
+          && incoming().uid == existing().uid
+          && incoming().updatedAt == request.time
+          && incoming().diff(existing()).affectedKeys().hasOnly(['email', 'consentVersion', 'updatedAt']);
+        allow delete: if isValidId(userId) && isValidId(docId) && (isOwner(userId) || isAdmin());
+      }
+    }
+
+    // Admins Lookup Table
+    match /admins/{userId} {
+      allow get: if isValidId(userId) && (isOwner(userId) || isAdmin());
+      allow list: if isPrimaryAdminEmail();
+      allow create: if isValidId(userId)
+        && isAdmin()
+        && isValidAdminRecord(incoming())
+        && incoming().uid == userId
+        && incoming().grantedBy == request.auth.uid
+        && incoming().createdAt == request.time;
+      allow update: if false;
+      allow delete: if isValidId(userId) && isAdmin() && userId != request.auth.uid;
+    }
+
+    // Workouts
+    match /workouts/{workoutId} {
+      allow get: if isValidId(workoutId) && (isOwner(existing().uid) || isAdmin());
+      allow list: if isPrimaryAdminEmail() || (isVerified() && resource.data.uid == request.auth.uid);
+      allow create: if isValidId(workoutId)
+        && isVerified()
+        && isValidWorkoutLog(incoming())
+        && incoming().id == workoutId
+        && incoming().uid == request.auth.uid
+        && incoming().createdAt == request.time;
+      allow update: if false;
+      allow delete: if isValidId(workoutId) && (isOwner(existing().uid) || isAdmin());
+    }
+
+    // Meals
+    match /meals/{mealId} {
+      allow get: if isValidId(mealId) && (isOwner(existing().uid) || isAdmin());
+      allow list: if isPrimaryAdminEmail() || (isVerified() && resource.data.uid == request.auth.uid);
+      allow create: if isValidId(mealId)
+        && isVerified()
+        && isValidMealLog(incoming())
+        && incoming().id == mealId
+        && incoming().uid == request.auth.uid
+        && incoming().createdAt == request.time;
+      allow update: if false;
+      allow delete: if isValidId(mealId) && (isOwner(existing().uid) || isAdmin());
+    }
+
+    // Body Measurements
+    match /measurements/{measurementId} {
+      allow get: if isValidId(measurementId) && (isOwner(existing().uid) || isAdmin());
+      allow list: if isPrimaryAdminEmail() || (isVerified() && resource.data.uid == request.auth.uid);
+      allow create: if isValidId(measurementId)
+        && isVerified()
+        && isValidBodyMeasurement(incoming())
+        && incoming().id == measurementId
+        && incoming().uid == request.auth.uid
+        && incoming().createdAt == request.time;
+      allow update: if false;
+      allow delete: if isValidId(measurementId) && (isOwner(existing().uid) || isAdmin());
+    }
+
+    // Personal Records
+    match /prs/{prId} {
+      allow get: if isValidId(prId) && (isOwner(existing().uid) || isAdmin());
+      allow list: if isPrimaryAdminEmail() || (isVerified() && resource.data.uid == request.auth.uid);
+      allow create: if isValidId(prId)
+        && isVerified()
+        && isValidPersonalRecord(incoming())
+        && incoming().id == prId
+        && incoming().uid == request.auth.uid
+        && incoming().createdAt == request.time;
+      allow update: if false;
+      allow delete: if isValidId(prId) && (isOwner(existing().uid) || isAdmin());
+    }
+
+    // Global Exercises Catalog
+    match /exercises/{exerciseId} {
+      allow get: if isValidId(exerciseId);
+      allow list: if true;
+      allow create: if isValidId(exerciseId)
+        && isAdmin()
+        && isValidCustomExercise(incoming())
+        && incoming().id == exerciseId
+        && incoming().createdBy == request.auth.uid
+        && incoming().createdAt == request.time;
+      allow update: if false;
+      allow delete: if isValidId(exerciseId) && isAdmin();
+    }
+
+    // Immutable Compliance & Admin Audit Logs
+    match /auditLogs/{logId} {
+      allow get: if isValidId(logId) && isAdmin();
+      allow list: if isPrimaryAdminEmail();
+      allow create: if isValidId(logId)
+        && isVerified()
+        && isValidAuditLog(incoming())
+        && incoming().id == logId
+        && incoming().actorUid == request.auth.uid
+        && incoming().createdAt == request.time;
+      allow update: if false;
+      allow delete: if false;
+    }
+  }
+}

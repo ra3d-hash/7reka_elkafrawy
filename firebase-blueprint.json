@@ -1,0 +1,471 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Public-safe athlete fitness profile, training goals, and RBAC role metadata.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "displayName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "role": {
+          "type": "string",
+          "enum": ["member", "coach", "admin"]
+        },
+        "status": {
+          "type": "string",
+          "enum": ["active", "suspended"]
+        },
+        "goal": {
+          "type": "string",
+          "enum": ["cut", "maintain", "bulk"]
+        },
+        "activityLevel": {
+          "type": "string",
+          "enum": ["sedentary", "light", "moderate", "active", "athlete"]
+        },
+        "targetCalories": {
+          "type": "number"
+        },
+        "targetProtein": {
+          "type": "number"
+        },
+        "targetCarbs": {
+          "type": "number"
+        },
+        "targetFats": {
+          "type": "number"
+        },
+        "disclaimerAccepted": {
+          "type": "boolean"
+        },
+        "heightCm": {
+          "type": "number"
+        },
+        "weightKg": {
+          "type": "number"
+        },
+        "age": {
+          "type": "number"
+        },
+        "gender": {
+          "type": "string",
+          "enum": ["male", "female"]
+        },
+        "onboardingCompleted": {
+          "type": "boolean"
+        },
+        "activeProgramId": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "activeDietId": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["uid", "displayName", "role", "status", "goal", "activityLevel", "targetCalories", "targetProtein", "targetCarbs", "targetFats", "disclaimerAccepted", "createdAt", "updatedAt"]
+    },
+    "UserPrivateInfo": {
+      "title": "UserPrivateInfo",
+      "description": "Isolated PII document for user email and Google Play privacy consent records.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "email": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 160
+        },
+        "consentVersion": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 32
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["uid", "email", "consentVersion", "updatedAt"]
+    },
+    "AdminRecord": {
+      "title": "AdminRecord",
+      "description": "Trusted administrator lookup registry.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "email": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 160
+        },
+        "grantedBy": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["uid", "email", "grantedBy", "createdAt"]
+    },
+    "WorkoutLog": {
+      "title": "WorkoutLog",
+      "description": "Logged training session set record.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "uid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "exerciseName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "discipline": {
+          "type": "string",
+          "enum": ["Bodybuilding", "Calisthenics", "CrossFit", "HIIT"]
+        },
+        "muscleGroup": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 40
+        },
+        "sets": {
+          "type": "number"
+        },
+        "reps": {
+          "type": "number"
+        },
+        "weightKg": {
+          "type": "number"
+        },
+        "durationSec": {
+          "type": "number"
+        },
+        "notes": {
+          "type": "string",
+          "maxLength": 300
+        },
+        "loggedDate": {
+          "type": "string",
+          "minLength": 8,
+          "maxLength": 20
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["id", "uid", "exerciseName", "discipline", "muscleGroup", "sets", "reps", "weightKg", "durationSec", "notes", "loggedDate", "createdAt"]
+    },
+    "MealLog": {
+      "title": "MealLog",
+      "description": "Nutrition and AI food scanner meal log entry.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "uid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "mealType": {
+          "type": "string",
+          "enum": ["Breakfast", "Lunch", "Dinner", "Snack"]
+        },
+        "calories": {
+          "type": "number"
+        },
+        "proteinG": {
+          "type": "number"
+        },
+        "carbsG": {
+          "type": "number"
+        },
+        "fatsG": {
+          "type": "number"
+        },
+        "source": {
+          "type": "string",
+          "enum": ["ai-scanner", "manual"]
+        },
+        "loggedDate": {
+          "type": "string",
+          "minLength": 8,
+          "maxLength": 20
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["id", "uid", "name", "mealType", "calories", "proteinG", "carbsG", "fatsG", "source", "loggedDate", "createdAt"]
+    },
+    "BodyMeasurement": {
+      "title": "BodyMeasurement",
+      "description": "Body composition and measurement entry.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "uid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "weightKg": {
+          "type": "number"
+        },
+        "bodyFatPct": {
+          "type": "number"
+        },
+        "waistCm": {
+          "type": "number"
+        },
+        "chestCm": {
+          "type": "number"
+        },
+        "armCm": {
+          "type": "number"
+        },
+        "recordedDate": {
+          "type": "string",
+          "minLength": 8,
+          "maxLength": 20
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["id", "uid", "weightKg", "bodyFatPct", "waistCm", "chestCm", "armCm", "recordedDate", "createdAt"]
+    },
+    "PersonalRecord": {
+      "title": "PersonalRecord",
+      "description": "Athlete strength Personal Record vault entry.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "uid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "exerciseName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "weightKg": {
+          "type": "number"
+        },
+        "reps": {
+          "type": "number"
+        },
+        "estimated1RmKg": {
+          "type": "number"
+        },
+        "achievedDate": {
+          "type": "string",
+          "minLength": 8,
+          "maxLength": 20
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["id", "uid", "exerciseName", "weightKg", "reps", "estimated1RmKg", "achievedDate", "createdAt"]
+    },
+    "CustomExercise": {
+      "title": "CustomExercise",
+      "description": "Admin-managed exercise catalog entry.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 100
+        },
+        "nameAr": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 100
+        },
+        "discipline": {
+          "type": "string",
+          "enum": ["Bodybuilding", "Calisthenics", "CrossFit", "HIIT"]
+        },
+        "muscleGroup": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 40
+        },
+        "equipment": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 40
+        },
+        "instructions": {
+          "type": "string",
+          "minLength": 5,
+          "maxLength": 400
+        },
+        "createdBy": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["id", "name", "nameAr", "discipline", "muscleGroup", "equipment", "instructions", "createdBy", "createdAt"]
+    },
+    "AuditLog": {
+      "title": "AuditLog",
+      "description": "Immutable compliance and administrative audit event.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "actorUid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "action": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 80
+        },
+        "targetId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "details": {
+          "type": "string",
+          "maxLength": 300
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["id", "actorUid", "action", "targetId", "details", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "Athlete profile and fitness targets."
+    },
+    "/users/{userId}/private/{docId}": {
+      "schema": { "$ref": "#/entities/UserPrivateInfo" },
+      "description": "Isolated PII document for user email and privacy consent."
+    },
+    "/admins/{userId}": {
+      "schema": { "$ref": "#/entities/AdminRecord" },
+      "description": "Trusted administrator lookup table."
+    },
+    "/workouts/{workoutId}": {
+      "schema": { "$ref": "#/entities/WorkoutLog" },
+      "description": "User workout logs."
+    },
+    "/meals/{mealId}": {
+      "schema": { "$ref": "#/entities/MealLog" },
+      "description": "User meal & AI scanner nutrition logs."
+    },
+    "/measurements/{measurementId}": {
+      "schema": { "$ref": "#/entities/BodyMeasurement" },
+      "description": "User body measurements."
+    },
+    "/prs/{prId}": {
+      "schema": { "$ref": "#/entities/PersonalRecord" },
+      "description": "User Personal Records vault."
+    },
+    "/exercises/{exerciseId}": {
+      "schema": { "$ref": "#/entities/CustomExercise" },
+      "description": "Admin-published global exercises."
+    },
+    "/auditLogs/{logId}": {
+      "schema": { "$ref": "#/entities/AuditLog" },
+      "description": "Immutable compliance and admin audit trail."
+    }
+  }
+}

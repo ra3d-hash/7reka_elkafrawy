@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <rect width="512" height="512" rx="112" fill="#070a11"/>
+  <rect x="28" y="28" width="456" height="456" rx="92" stroke="#10b981" stroke-opacity="0.35" stroke-width="6"/>
+  <path d="M136 144H376V196H196V232H344V282H196V318H376V368H136V144Z" fill="url(#elarbGrad)"/>
+  <path d="M326 112L368 112L346 154H304L326 112Z" fill="#06b6d4"/>
+  <defs>
+    <linearGradient id="elarbGrad" x1="136" y1="144" x2="376" y2="368" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#10b981"/>
+      <stop offset="1" stop-color="#06b6d4"/>
+    </linearGradient>
+  </defs>
+</svg>
