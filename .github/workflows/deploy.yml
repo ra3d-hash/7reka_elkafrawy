@@ -40,8 +40,10 @@ jobs:
         npx cap init "ELARB FitPro Ultra" "com.elarb.fitpro.ultra" --web-dir dist --yes
         npx cap add android
 
-    - name: Build APK via Gradle
+    - name: Accept Android Licenses & Build APK via Gradle
       run: |
+        export ANDROID_HOME=$ANDROID_SDK_ROOT
+        yes | sdkmanager --licenses || true
         cd android
         chmod +x gradlew
         ./gradlew assembleDebug
