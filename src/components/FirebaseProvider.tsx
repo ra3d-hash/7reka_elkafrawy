@@ -13,6 +13,7 @@ import {
   updateDoc,
   where,
   writeBatch,
+  type DocumentReference,
 } from 'firebase/firestore';
 import {
   auth,
@@ -27,12 +28,15 @@ import type {
   ActivityLevel,
   AuditLogEntry,
   BodyMeasurement,
+  DirectMessage,
   Discipline,
   ExerciseItem,
   FitnessGoal,
+  FriendContact,
   MealLog,
   MealType,
   PersonalRecord,
+  SoloLeagueEntry,
   UserProfile,
   UserRole,
   UserStatus,
@@ -74,6 +78,10 @@ function makeId(prefix: string): string {
   return `${prefix}_${Date.now()}_${rand}`.replace(/[^a-zA-Z0-9_-]/g, '_');
 }
 
+function finiteOr(val: number, fallback: number): number {
+  return Number.isFinite(val) ? val : fallback;
+}
+
 function readLocal<T>(key: string, fallback: T): T {
   try {
     const raw = localStorage.getItem(key);
@@ -91,8 +99,17 @@ function writeLocal(key: string, value: unknown) {
   }
 }
 
+function timestampMillis(ts: unknown): number {
+  if (!ts || typeof ts !== 'object') return 0;
+  const maybe = ts as { toMillis?: () => number; seconds?: number };
+  if (typeof maybe.toMillis === 'function') return maybe.toMillis();
+  if (typeof maybe.seconds === 'number') return maybe.seconds * 1000;
+  return 0;
+}
+
 interface FitnessContextValue {
   user: User | null;
+  emailUnverified: boolean;
   authReady: boolean;
   profileLoaded: boolean;
   needsOnboarding: boolean;
@@ -103,6 +120,9 @@ interface FitnessContextValue {
   measurements: BodyMeasurement[];
   prs: PersonalRecord[];
   customExercises: ExerciseItem[];
+  soloLeague: SoloLeagueEntry[];
+  friends: FriendContact[];
+  directMessages: DirectMessage[];
   allUsers: UserProfile[];
   auditLogs: AuditLogEntry[];
   busyAction: string | null;
@@ -166,6 +186,9 @@ interface FitnessContextValue {
     weightKg: number;
     reps: number;
   }) => Promise<void>;
+  addFriendContact: (friendUid: string, displayName: string) => Promise<void>;
+  removeFriendContact: (friendUid: string) => Promise<void>;
+  sendDirectMessage: (receiverUid: string, receiverName: string, message: string) => Promise<void>;
   adminUpdateUser: (targetUid: string, role: UserRole, status: UserStatus) => Promise<void>;
   adminPublishExercise: (entry: {
     name: string;
@@ -199,15 +222,20 @@ export const FirebaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   );
   const [prs, setPrs] = useState<PersonalRecord[]>(() => readLocal(STORAGE_KEYS.prs, []));
   const [customExercises, setCustomExercises] = useState<ExerciseItem[]>([]);
+  const [soloLeague, setSoloLeague] = useState<SoloLeagueEntry[]>([]);
+  const [friends, setFriends] = useState<FriendContact[]>([]);
+  const [directMessages, setDirectMessages] = useState<DirectMessage[]>([]);
   const [allUsers, setAllUsers] = useState<UserProfile[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([]);
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [errorBanner, setErrorBanner] = useState<string | null>(null);
 
+  const isVerifiedUser = Boolean(user && user.emailVerified);
+  const emailUnverified = Boolean(user && !user.emailVerified);
   const isPrimaryAdmin = Boolean(user?.email === 'elarbvip@gmail.com' && user?.emailVerified);
-  const isAdmin = isPrimaryAdmin || isAdminDoc || profile.role === 'admin';
+  const isAdmin = isPrimaryAdmin || isAdminDoc;
   const needsOnboarding = Boolean(
-    user &&
+    isVerifiedUser &&
       profileLoaded &&
       (!profile.onboardingCompleted || !profile.heightCm || profile.heightCm < 100 || !profile.weightKg || profile.weightKg < 30)
   );
@@ -291,6 +319,9 @@ export const FirebaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           setProfileLoaded(true);
         }
       } else {
+        setFriends([]);
+        setDirectMessages([]);
+        setSoloLeague([]);
         setProfileLoaded(true);
       }
       setAuthReady(true);
@@ -303,7 +334,7 @@ export const FirebaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   }, []);
 
   useEffect(() => {
-    if (!authReady || !user) return;
+    if (!authReady || !user || !user.emailVerified) return;
 
     const uid = user.uid;
     const unsubs: Array<() => void> = [];
@@ -372,10 +403,88 @@ export const FirebaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       )
     );
 
+    unsubs.push(
+      onSnapshot(
+        collection(db, 'leagueEntries'),
+        (snap) => {
+          const rows = snap.docs.map((d) => d.data() as SoloLeagueEntry);
+          rows.sort((a, b) => b.score - a.score);
+          setSoloLeague(rows);
+        },
+        () => {
+          // non-fatal if offline or bootstrapping
+        }
+      )
+    );
+
+    unsubs.push(
+      onSnapshot(
+        collection(db, 'users', uid, 'friends'),
+        (snap) => {
+          const rows = snap.docs.map((d) => d.data() as FriendContact);
+          rows.sort((a, b) => a.displayName.localeCompare(b.displayName));
+          setFriends(rows);
+        },
+        () => {
+          // non-fatal if offline
+        }
+      )
+    );
+
+    unsubs.push(
+      onSnapshot(
+        query(collection(db, 'directMessages'), where('participants', 'array-contains', uid)),
+        (snap) => {
+          const rows = snap.docs.map((d) => d.data() as DirectMessage);
+          rows.sort((a, b) => {
+            const diff = timestampMillis(a.createdAt) - timestampMillis(b.createdAt);
+            return diff !== 0 ? diff : a.id.localeCompare(b.id);
+          });
+          setDirectMessages(rows);
+        },
+        () => {
+          // non-fatal if offline
+        }
+      )
+    );
+
     return () => {
       unsubs.forEach((fn) => fn());
     };
   }, [authReady, user]);
+
+  // Auto-sync verified athlete points into public-safe Solo League standings
+  useEffect(() => {
+    if (!authReady || !isVerifiedUser || !user || !profileLoaded) return;
+    if (!profile.onboardingCompleted || profile.uid !== user.uid) return;
+
+    const workoutsCount = workouts.length;
+    const prsCount = prs.length;
+    const computedScore = 350 + workoutsCount * 100 + prsCount * 250;
+    const displayName = (profile.displayName || user.displayName || 'ELARB Athlete').trim().slice(0, 80) || 'ELARB Athlete';
+
+    const existing = soloLeague.find((entry) => entry.uid === user.uid);
+    if (
+      existing &&
+      existing.score === computedScore &&
+      existing.workoutsCount === workoutsCount &&
+      existing.prsCount === prsCount &&
+      existing.displayName === displayName
+    ) {
+      return;
+    }
+
+    setDoc(doc(db, 'leagueEntries', user.uid), {
+      uid: user.uid,
+      displayName,
+      score: computedScore,
+      workoutsCount,
+      prsCount,
+      updatedAt: serverTimestamp(),
+    }).catch(() => {
+      // non-blocking sync
+    });
+  }, [authReady, isVerifiedUser, user, profileLoaded, profile.onboardingCompleted, profile.uid, profile.displayName, workouts.length, prs.length, soloLeague]);
 
   useEffect(() => {
     if (!authReady || !user || !isPrimaryAdmin) {
@@ -429,6 +538,9 @@ export const FirebaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       setMeals(readLocal(STORAGE_KEYS.meals, []));
       setMeasurements(readLocal(STORAGE_KEYS.measurements, []));
       setPrs(readLocal(STORAGE_KEYS.prs, []));
+      setFriends([]);
+      setDirectMessages([]);
+      setSoloLeague([]);
     } finally {
       setBusyAction(null);
     }
@@ -437,7 +549,7 @@ export const FirebaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const acknowledgeDisclaimer = async () => {
     writeLocal(STORAGE_KEYS.disclaimer, true);
     setProfile((prev) => ({ ...prev, disclaimerAccepted: true }));
-    if (user) {
+    if (user && user.emailVerified) {
       try {
         await updateDoc(doc(db, 'users', user.uid), {
           disclaimerAccepted: true,
@@ -462,16 +574,16 @@ export const FirebaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     targetFats: number;
   }) => {
     const clean = {
-      heightCm: Math.min(250, Math.max(100, Math.round(params.heightCm))),
-      weightKg: Math.min(400, Math.max(30, Number(params.weightKg.toFixed(1)))),
-      age: Math.min(100, Math.max(12, Math.round(params.age))),
+      heightCm: Math.min(250, Math.max(100, Math.round(finiteOr(params.heightCm, 175)))),
+      weightKg: Math.min(400, Math.max(30, Number(finiteOr(params.weightKg, 75).toFixed(1)))),
+      age: Math.min(100, Math.max(12, Math.round(finiteOr(params.age, 25)))),
       gender: params.gender,
       goal: params.goal,
       activityLevel: params.activityLevel,
-      targetCalories: Math.min(10000, Math.max(800, Math.round(params.targetCalories))),
-      targetProtein: Math.min(600, Math.max(20, Math.round(params.targetProtein))),
-      targetCarbs: Math.min(1200, Math.max(0, Math.round(params.targetCarbs))),
-      targetFats: Math.min(400, Math.max(10, Math.round(params.targetFats))),
+      targetCalories: Math.min(10000, Math.max(800, Math.round(finiteOr(params.targetCalories, 2400)))),
+      targetProtein: Math.min(600, Math.max(20, Math.round(finiteOr(params.targetProtein, 160)))),
+      targetCarbs: Math.min(1200, Math.max(0, Math.round(finiteOr(params.targetCarbs, 250)))),
+      targetFats: Math.min(400, Math.max(10, Math.round(finiteOr(params.targetFats, 70)))),
       disclaimerAccepted: true,
       onboardingCompleted: true,
       activeProgramId:
@@ -488,7 +600,7 @@ export const FirebaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     writeLocal(STORAGE_KEYS.targets, clean);
     setProfile((prev) => ({ ...prev, ...clean }));
     try {
-      if (user) {
+      if (user && user.emailVerified) {
         await updateDoc(doc(db, 'users', user.uid), {
           ...clean,
           updatedAt: serverTimestamp(),
@@ -517,7 +629,7 @@ export const FirebaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const setActiveProgram = async (programId: string) => {
     const cleanId = programId.trim().slice(0, 64);
     setProfile((prev) => ({ ...prev, activeProgramId: cleanId }));
-    if (user) {
+    if (user && user.emailVerified) {
       try {
         await updateDoc(doc(db, 'users', user.uid), {
           activeProgramId: cleanId,
@@ -532,7 +644,7 @@ export const FirebaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const setActiveDiet = async (dietId: string) => {
     const cleanId = dietId.trim().slice(0, 64);
     setProfile((prev) => ({ ...prev, activeDietId: cleanId }));
-    if (user) {
+    if (user && user.emailVerified) {
       try {
         await updateDoc(doc(db, 'users', user.uid), {
           activeDietId: cleanId,
@@ -555,14 +667,14 @@ export const FirebaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     const clamped = {
       goal: params.goal,
       activityLevel: params.activityLevel,
-      targetCalories: Math.min(10000, Math.max(800, Math.round(params.targetCalories))),
-      targetProtein: Math.min(600, Math.max(20, Math.round(params.targetProtein))),
-      targetCarbs: Math.min(1200, Math.max(0, Math.round(params.targetCarbs))),
-      targetFats: Math.min(400, Math.max(10, Math.round(params.targetFats))),
+      targetCalories: Math.min(10000, Math.max(800, Math.round(finiteOr(params.targetCalories, 2400)))),
+      targetProtein: Math.min(600, Math.max(20, Math.round(finiteOr(params.targetProtein, 160)))),
+      targetCarbs: Math.min(1200, Math.max(0, Math.round(finiteOr(params.targetCarbs, 250)))),
+      targetFats: Math.min(400, Math.max(10, Math.round(finiteOr(params.targetFats, 70)))),
     };
     writeLocal(STORAGE_KEYS.targets, clamped);
     setProfile((prev) => ({ ...prev, ...clamped }));
-    if (user) {
+    if (user && user.emailVerified) {
       try {
         await updateDoc(doc(db, 'users', user.uid), {
           ...clamped,
@@ -592,15 +704,15 @@ export const FirebaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       exerciseName: entry.exerciseName.trim().slice(0, 100) || 'Training Set',
       discipline: entry.discipline,
       muscleGroup: entry.muscleGroup.trim().slice(0, 40) || 'Full Body',
-      sets: Math.min(100, Math.max(1, Math.round(entry.sets))),
-      reps: Math.min(500, Math.max(1, Math.round(entry.reps))),
-      weightKg: Math.min(1000, Math.max(0, Number(entry.weightKg))),
-      durationSec: Math.min(86400, Math.max(0, Math.round(entry.durationSec))),
+      sets: Math.min(100, Math.max(1, Math.round(finiteOr(entry.sets, 3)))),
+      reps: Math.min(500, Math.max(1, Math.round(finiteOr(entry.reps, 10)))),
+      weightKg: Math.min(1000, Math.max(0, Number(finiteOr(entry.weightKg, 0).toFixed(1)))),
+      durationSec: Math.min(86400, Math.max(0, Math.round(finiteOr(entry.durationSec, 90)))),
       notes: entry.notes.trim().slice(0, 300),
       loggedDate: today,
     };
 
-    if (!user) {
+    if (!user || !user.emailVerified) {
       const next = [payload, ...workouts];
       setWorkouts(next);
       writeLocal(STORAGE_KEYS.workouts, next);
@@ -618,7 +730,7 @@ export const FirebaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   };
 
   const removeWorkoutLog = async (id: string) => {
-    if (!user) {
+    if (!user || !user.emailVerified) {
       const next = workouts.filter((w) => w.id !== id);
       setWorkouts(next);
       writeLocal(STORAGE_KEYS.workouts, next);
@@ -647,15 +759,15 @@ export const FirebaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       uid: user?.uid ?? 'guest-preview',
       name: entry.name.trim().slice(0, 120) || 'Logged Meal',
       mealType: entry.mealType,
-      calories: Math.min(10000, Math.max(0, Math.round(entry.calories))),
-      proteinG: Math.min(1000, Math.max(0, Math.round(entry.proteinG))),
-      carbsG: Math.min(1500, Math.max(0, Math.round(entry.carbsG))),
-      fatsG: Math.min(1000, Math.max(0, Math.round(entry.fatsG))),
+      calories: Math.min(10000, Math.max(0, Math.round(finiteOr(entry.calories, 0)))),
+      proteinG: Math.min(1000, Math.max(0, Math.round(finiteOr(entry.proteinG, 0)))),
+      carbsG: Math.min(1500, Math.max(0, Math.round(finiteOr(entry.carbsG, 0)))),
+      fatsG: Math.min(1000, Math.max(0, Math.round(finiteOr(entry.fatsG, 0)))),
       source: entry.source,
       loggedDate: today,
     };
 
-    if (!user) {
+    if (!user || !user.emailVerified) {
       const next = [payload, ...meals];
       setMeals(next);
       writeLocal(STORAGE_KEYS.meals, next);
@@ -673,7 +785,7 @@ export const FirebaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   };
 
   const removeMealLog = async (id: string) => {
-    if (!user) {
+    if (!user || !user.emailVerified) {
       const next = meals.filter((m) => m.id !== id);
       setMeals(next);
       writeLocal(STORAGE_KEYS.meals, next);
@@ -698,15 +810,15 @@ export const FirebaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     const payload: BodyMeasurement = {
       id,
       uid: user?.uid ?? 'guest-preview',
-      weightKg: Math.min(400, Math.max(20, Number(entry.weightKg.toFixed(1)))),
-      bodyFatPct: Math.min(75, Math.max(2, Number(entry.bodyFatPct.toFixed(1)))),
-      waistCm: Math.min(250, Math.max(30, Number(entry.waistCm.toFixed(1)))),
-      chestCm: Math.min(250, Math.max(40, Number(entry.chestCm.toFixed(1)))),
-      armCm: Math.min(100, Math.max(15, Number(entry.armCm.toFixed(1)))),
+      weightKg: Math.min(400, Math.max(20, Number(finiteOr(entry.weightKg, 75).toFixed(1)))),
+      bodyFatPct: Math.min(75, Math.max(2, Number(finiteOr(entry.bodyFatPct, 18).toFixed(1)))),
+      waistCm: Math.min(250, Math.max(30, Number(finiteOr(entry.waistCm, 84).toFixed(1)))),
+      chestCm: Math.min(250, Math.max(40, Number(finiteOr(entry.chestCm, 100).toFixed(1)))),
+      armCm: Math.min(100, Math.max(15, Number(finiteOr(entry.armCm, 35).toFixed(1)))),
       recordedDate: today,
     };
 
-    if (!user) {
+    if (!user || !user.emailVerified) {
       const next = [...measurements, payload];
       setMeasurements(next);
       writeLocal(STORAGE_KEYS.measurements, next);
@@ -730,8 +842,8 @@ export const FirebaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   }) => {
     const id = makeId('pr');
     const today = new Date().toISOString().slice(0, 10);
-    const weight = Math.min(1000, Math.max(0, Number(entry.weightKg)));
-    const reps = Math.min(200, Math.max(1, Math.round(entry.reps)));
+    const weight = Math.min(1000, Math.max(0, Number(finiteOr(entry.weightKg, 0).toFixed(1))));
+    const reps = Math.min(200, Math.max(1, Math.round(finiteOr(entry.reps, 1))));
     const estimated1RmKg = Number((weight * (1 + reps / 30)).toFixed(1));
     const payload: PersonalRecord = {
       id,
@@ -743,7 +855,7 @@ export const FirebaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       achievedDate: today,
     };
 
-    if (!user) {
+    if (!user || !user.emailVerified) {
       const next = [payload, ...prs].sort((a, b) => b.estimated1RmKg - a.estimated1RmKg);
       setPrs(next);
       writeLocal(STORAGE_KEYS.prs, next);
@@ -760,14 +872,82 @@ export const FirebaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     }
   };
 
+  const addFriendContact = async (friendUid: string, displayName: string) => {
+    if (!user || !user.emailVerified) return;
+    const cleanUid = friendUid.trim().replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 128);
+    const cleanName = displayName.trim().slice(0, 80);
+    if (!cleanUid || !cleanName || cleanUid === user.uid) return;
+
+    try {
+      await setDoc(doc(db, 'users', user.uid, 'friends', cleanUid), {
+        uid: cleanUid,
+        displayName: cleanName,
+        addedAt: serverTimestamp(),
+      });
+    } catch (err) {
+      handleFirestoreError(err, OperationType.CREATE, `users/${user.uid}/friends/${cleanUid}`);
+    }
+  };
+
+  const removeFriendContact = async (friendUid: string) => {
+    if (!user || !user.emailVerified) return;
+    const cleanUid = friendUid.trim().replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 128);
+    if (!cleanUid) return;
+    try {
+      await deleteDoc(doc(db, 'users', user.uid, 'friends', cleanUid));
+    } catch (err) {
+      handleFirestoreError(err, OperationType.DELETE, `users/${user.uid}/friends/${cleanUid}`);
+    }
+  };
+
+  const sendDirectMessage = async (receiverUid: string, receiverName: string, message: string) => {
+    if (!user || !user.emailVerified) return;
+    const cleanReceiverUid = receiverUid.trim().replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 128);
+    const cleanMsg = message.trim().slice(0, 600);
+    if (!cleanReceiverUid || !cleanMsg || cleanReceiverUid === user.uid) return;
+
+    const id = makeId('dm');
+    const senderName = (profile.displayName || user.displayName || 'ELARB Athlete').trim().slice(0, 80) || 'ELARB Athlete';
+    const cleanReceiverName = receiverName.trim().slice(0, 80) || 'Athlete';
+    const participants = [user.uid, cleanReceiverUid].sort();
+
+    try {
+      await setDoc(doc(db, 'directMessages', id), {
+        id,
+        participants,
+        senderUid: user.uid,
+        senderName,
+        receiverUid: cleanReceiverUid,
+        receiverName: cleanReceiverName,
+        message: cleanMsg,
+        createdAt: serverTimestamp(),
+      });
+    } catch (err) {
+      handleFirestoreError(err, OperationType.CREATE, `directMessages/${id}`);
+    }
+  };
+
   const adminUpdateUser = async (targetUid: string, role: UserRole, status: UserStatus) => {
-    if (!user || !isAdmin) return;
+    if (!user || !user.emailVerified || !isAdmin) return;
     try {
       await updateDoc(doc(db, 'users', targetUid), {
         role,
         status,
         updatedAt: serverTimestamp(),
       });
+
+      // Keep /admins registry in sync with role elevation/demotion
+      if (role === 'admin') {
+        await setDoc(doc(db, 'admins', targetUid), {
+          uid: targetUid,
+          email: 'delegated-admin@elarb.app',
+          grantedBy: user.uid,
+          createdAt: serverTimestamp(),
+        });
+      } else if (targetUid !== user.uid) {
+        await deleteDoc(doc(db, 'admins', targetUid)).catch(() => {});
+      }
+
       const logId = makeId('aud');
       await setDoc(doc(db, 'auditLogs', logId), {
         id: logId,
@@ -790,7 +970,7 @@ export const FirebaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     equipment: string;
     instructions: string;
   }) => {
-    if (!user || !isAdmin) return;
+    if (!user || !user.emailVerified || !isAdmin) return;
     const id = makeId('ex');
     try {
       await setDoc(doc(db, 'exercises', id), {
@@ -838,6 +1018,7 @@ export const FirebaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       meals,
       measurements,
       prs,
+      friends,
     };
     const blob = new Blob([JSON.stringify(bundle, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -852,26 +1033,38 @@ export const FirebaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     setBusyAction('delete-account');
     try {
       clearLocalCache();
-      if (user) {
+      if (user && user.emailVerified) {
         const uid = user.uid;
-        const batch = writeBatch(db);
+        const refsToDelete: DocumentReference[] = [];
         const colNames = ['workouts', 'meals', 'measurements', 'prs'] as const;
         for (const colName of colNames) {
           const snap = await getDocs(query(collection(db, colName), where('uid', '==', uid)));
-          snap.docs.forEach((d) => batch.delete(d.ref));
+          snap.docs.forEach((d) => refsToDelete.push(d.ref));
         }
-        batch.delete(doc(db, 'users', uid, 'private', 'pii'));
-        batch.delete(doc(db, 'users', uid));
-        const logId = makeId('aud');
-        batch.set(doc(db, 'auditLogs', logId), {
-          id: logId,
-          actorUid: uid,
-          action: 'ACCOUNT_DATA_DELETED',
-          targetId: uid,
-          details: 'User executed Google Play self-service account data deletion.',
-          createdAt: serverTimestamp(),
-        });
-        await batch.commit();
+        const friendsSnap = await getDocs(collection(db, 'users', uid, 'friends'));
+        friendsSnap.docs.forEach((d) => refsToDelete.push(d.ref));
+
+        refsToDelete.push(doc(db, 'leagueEntries', uid));
+        refsToDelete.push(doc(db, 'users', uid, 'private', 'pii'));
+        refsToDelete.push(doc(db, 'users', uid));
+
+        // Commit in chunks safely below Firestore's 500-write batch limit
+        for (let i = 0; i < refsToDelete.length; i += 400) {
+          const batch = writeBatch(db);
+          refsToDelete.slice(i, i + 400).forEach((ref) => batch.delete(ref));
+          if (i + 400 >= refsToDelete.length) {
+            const logId = makeId('aud');
+            batch.set(doc(db, 'auditLogs', logId), {
+              id: logId,
+              actorUid: uid,
+              action: 'ACCOUNT_DATA_DELETED',
+              targetId: uid,
+              details: 'User executed Google Play self-service account data deletion.',
+              createdAt: serverTimestamp(),
+            });
+          }
+          await batch.commit();
+        }
         await signOutUser();
       }
     } catch (err) {
@@ -885,6 +1078,7 @@ export const FirebaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     <FitnessContext.Provider
       value={{
         user,
+        emailUnverified,
         authReady,
         profileLoaded,
         needsOnboarding,
@@ -895,6 +1089,9 @@ export const FirebaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         measurements,
         prs,
         customExercises,
+        soloLeague,
+        friends,
+        directMessages,
         allUsers,
         auditLogs,
         busyAction,
@@ -913,6 +1110,9 @@ export const FirebaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         removeMealLog,
         addBodyMeasurement,
         addPersonalRecord,
+        addFriendContact,
+        removeFriendContact,
+        sendDirectMessage,
         adminUpdateUser,
         adminPublishExercise,
         clearLocalCache,

@@ -13,6 +13,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { motion } from 'motion/react';
+import { MEDIA_ASSETS } from '../lib/mediaAssets';
 import { useFitness } from './FirebaseProvider';
 import type { ActivityLevel, FitnessGoal, Language } from '../types/fitness';
 
@@ -25,7 +26,7 @@ export const MandatoryAuthAndOnboarding: React.FC<MandatoryAuthAndOnboardingProp
   language,
   onChangeLanguage,
 }) => {
-  const { user, needsOnboarding, busyAction, errorBanner, clearError, loginWithGoogle, logout, completeMandatoryOnboarding } =
+  const { user, emailUnverified, busyAction, errorBanner, clearError, loginWithGoogle, logout, completeMandatoryOnboarding } =
     useFitness();
 
   const isAr = language === 'ar';
@@ -112,7 +113,7 @@ export const MandatoryAuthAndOnboarding: React.FC<MandatoryAuthAndOnboardingProp
       {/* Full-Bleed Architectural Gym Backdrop */}
       <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden" aria-hidden="true">
         <img
-          src="/src/assets/images/bg_obsidian_club_1794753821831.jpg"
+          src={MEDIA_ASSETS.bgObsidianClub}
           alt=""
           referrerPolicy="no-referrer"
           className="absolute inset-0 h-full w-full object-cover opacity-50"
@@ -179,7 +180,26 @@ export const MandatoryAuthAndOnboarding: React.FC<MandatoryAuthAndOnboardingProp
 
       {/* Center Stage: Mandatory Sign-In OR Mandatory Biometrics Onboarding */}
       <main className="relative z-20 mx-auto w-full max-w-4xl my-6 flex-1 flex items-center justify-center">
-        {!user ? (
+        {emailUnverified ? (
+          <section className="w-full max-w-lg glass-panel-elevated rounded-[32px] p-8 text-center space-y-5">
+            <ShieldCheck className="h-10 w-10 text-amber-400 mx-auto" />
+            <h1 className="text-2xl font-extrabold text-white">
+              {isAr ? 'تأكيد البريد الإلكتروني مطلوب' : 'Email Verification Required'}
+            </h1>
+            <p className="text-sm text-slate-300 leading-relaxed">
+              {isAr
+                ? 'حسابك مسجل حالياً ببريد إلكتروني غير مؤكد. يرجى تسجيل الدخول بحساب Google مؤكد لحماية بياناتك ومزامنتها سحابياً.'
+                : 'Your signed-in account does not have a verified email yet. Please sign in with a verified Google account to protect your cloud data.'}
+            </p>
+            <button
+              type="button"
+              onClick={logout}
+              className="min-h-[46px] px-6 rounded-full bg-gradient-to-r from-amber-300 via-amber-400 to-orange-400 text-slate-950 text-sm font-extrabold"
+            >
+              {isAr ? 'تبديل الحساب' : 'Switch Account'}
+            </button>
+          </section>
+        ) : !user ? (
           /* STAGE 1: MANDATORY GOOGLE LOGIN GATE */
           <section className="w-full glass-panel-elevated rounded-[32px] overflow-hidden grid grid-cols-1 lg:grid-cols-12">
             <div className="lg:col-span-7 p-6 sm:p-10 flex flex-col justify-between gap-6">
@@ -241,7 +261,7 @@ export const MandatoryAuthAndOnboarding: React.FC<MandatoryAuthAndOnboardingProp
 
             <div className="lg:col-span-5 relative min-h-[240px] bg-slate-950/60 overflow-hidden">
               <img
-                src="/src/assets/images/hero_gym_studio_1794750798669.jpg"
+                src={MEDIA_ASSETS.heroGymStudio}
                 alt="ELARB FitPro Ultra training club"
                 referrerPolicy="no-referrer"
                 className="h-full w-full object-cover"

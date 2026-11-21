@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { BarChart3, Plus, Ruler, Trophy } from 'lucide-react';
 import { getCopy } from '../lib/i18n';
+import { MEDIA_ASSETS } from '../lib/mediaAssets';
 import { useFitness } from './FirebaseProvider';
 import type { Language } from '../types/fitness';
 
@@ -62,7 +63,7 @@ export const ProgressAnalyticsView: React.FC<{ language: Language }> = ({ langua
     <div className="space-y-6">
       <section className="relative overflow-hidden rounded-3xl glass-panel border border-white/10">
         <img
-          src="/src/assets/images/bg_recovery_lounge_1794753825056.jpg"
+          src={MEDIA_ASSETS.bgRecoveryLounge}
           alt="ELARB Performance Analytics Lounge"
           referrerPolicy="no-referrer"
           className="absolute inset-0 h-full w-full object-cover opacity-45"

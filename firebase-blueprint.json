@@ -428,6 +428,110 @@
         }
       },
       "required": ["id", "actorUid", "action", "targetId", "details", "createdAt"]
+    },
+    "SoloLeagueEntry": {
+      "title": "SoloLeagueEntry",
+      "description": "Public-safe verified athlete points record for the Solo Championship League (no PII).",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "displayName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "score": {
+          "type": "number"
+        },
+        "workoutsCount": {
+          "type": "number"
+        },
+        "prsCount": {
+          "type": "number"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["uid", "displayName", "score", "workoutsCount", "prsCount", "updatedAt"]
+    },
+    "FriendContact": {
+      "title": "FriendContact",
+      "description": "Private user friend contact for 1-on-1 Direct Chat.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "displayName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "addedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["uid", "displayName", "addedAt"]
+    },
+    "DirectMessage": {
+      "title": "DirectMessage",
+      "description": "1-on-1 participant-scoped direct chat message.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "participants": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "senderUid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "senderName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "receiverUid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "receiverName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "message": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 600
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["id", "participants", "senderUid", "senderName", "receiverUid", "receiverName", "message", "createdAt"]
     }
   },
   "firestore": {
@@ -438,6 +542,10 @@
     "/users/{userId}/private/{docId}": {
       "schema": { "$ref": "#/entities/UserPrivateInfo" },
       "description": "Isolated PII document for user email and privacy consent."
+    },
+    "/users/{userId}/friends/{friendUid}": {
+      "schema": { "$ref": "#/entities/FriendContact" },
+      "description": "User real friend contacts for direct chat."
     },
     "/admins/{userId}": {
       "schema": { "$ref": "#/entities/AdminRecord" },
@@ -462,6 +570,14 @@
     "/exercises/{exerciseId}": {
       "schema": { "$ref": "#/entities/CustomExercise" },
       "description": "Admin-published global exercises."
+    },
+    "/leagueEntries/{userId}": {
+      "schema": { "$ref": "#/entities/SoloLeagueEntry" },
+      "description": "Public-safe verified athlete Solo League standings."
+    },
+    "/directMessages/{messageId}": {
+      "schema": { "$ref": "#/entities/DirectMessage" },
+      "description": "Participant-scoped 1-on-1 direct chat messages."
     },
     "/auditLogs/{logId}": {
       "schema": { "$ref": "#/entities/AuditLog" },

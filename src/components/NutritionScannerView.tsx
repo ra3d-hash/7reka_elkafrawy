@@ -13,6 +13,7 @@ import {
 import { motion } from 'motion/react';
 import { READY_DIET_PLANS } from '../data/diets';
 import { getCopy } from '../lib/i18n';
+import { MEDIA_ASSETS } from '../lib/mediaAssets';
 import { useFitness } from './FirebaseProvider';
 import type { ActivityLevel, FitnessGoal, FoodAnalysisResult, Language, MealType } from '../types/fitness';
 
@@ -136,6 +137,23 @@ export const NutritionScannerView: React.FC<{ language: Language }> = ({ languag
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    const allowed = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif']);
+    if (!allowed.has(file.type.toLowerCase())) {
+      setAnalysisError(
+        isAr
+          ? 'صيغة الصورة غير مدعومة. استخدم JPEG أو PNG أو WebP.'
+          : 'Unsupported image format. Please choose JPEG, PNG, WebP, or HEIC.'
+      );
+      return;
+    }
+    if (file.size > 6 * 1024 * 1024) {
+      setAnalysisError(
+        isAr
+          ? 'حجم الصورة كبير جداً (الحد الأقصى 6 ميجابايت).'
+          : 'Image file is too large (max 6 MB).'
+      );
+      return;
+    }
     setMimeType(file.type || 'image/jpeg');
     const reader = new FileReader();
     reader.onload = () => {
@@ -149,7 +167,7 @@ export const NutritionScannerView: React.FC<{ language: Language }> = ({ languag
   };
 
   const handleLoadSampleMeal = async () => {
-    const samplePath = '/src/assets/images/meal_macro_bowl_1794750798774.jpg';
+    const samplePath = MEDIA_ASSETS.mealMacroBowl;
     setPreviewUrl(samplePath);
     setMealDescription(
       isAr
@@ -218,9 +236,12 @@ export const NutritionScannerView: React.FC<{ language: Language }> = ({ languag
     setMealSaved(true);
   };
 
-  // Mifflin-St Jeor calculation
+  // Mifflin-St Jeor calculation (NaN-safe clamped inputs)
+  const safeWeightKg = Number.isFinite(weightKg) && weightKg > 0 ? Math.min(300, Math.max(35, weightKg)) : 75;
+  const safeHeightCm = Number.isFinite(heightCm) && heightCm > 0 ? Math.min(240, Math.max(120, heightCm)) : 175;
+  const safeAge = Number.isFinite(age) && age > 0 ? Math.min(95, Math.max(14, age)) : 25;
   const bmr = Math.round(
-    10 * weightKg + 6.25 * heightCm - 5 * age + (gender === 'male' ? 5 : -161)
+    10 * safeWeightKg + 6.25 * safeHeightCm - 5 * safeAge + (gender === 'male' ? 5 : -161)
   );
   const multipliers: Record<ActivityLevel, number> = {
     sedentary: 1.2,
@@ -232,7 +253,7 @@ export const NutritionScannerView: React.FC<{ language: Language }> = ({ languag
   const tdee = Math.round(bmr * multipliers[activityLevel]);
   const targetCalories =
     goal === 'cut' ? Math.max(1200, tdee - 450) : goal === 'bulk' ? tdee + 300 : tdee;
-  const targetProtein = Math.round(weightKg * 2.0);
+  const targetProtein = Math.round(safeWeightKg * 2.0);
   const targetFats = Math.round((targetCalories * 0.25) / 9);
   const targetCarbs = Math.max(
     40,
@@ -257,7 +278,7 @@ export const NutritionScannerView: React.FC<{ language: Language }> = ({ languag
       {/* Banner Header + Mode Toggle */}
       <section className="relative overflow-hidden rounded-[28px] glass-panel border border-white/10">
         <img
-          src="/src/assets/images/bg_nutrition_culinary_1794753823677.jpg"
+          src={MEDIA_ASSETS.bgNutritionCulinary}
           alt="ELARB Sports Nutrition Culinary Studio"
           referrerPolicy="no-referrer"
           className="absolute inset-0 h-full w-full object-cover opacity-50"

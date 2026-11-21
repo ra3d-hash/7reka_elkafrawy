@@ -1,6 +1,5 @@
 import React, { useMemo, useState } from 'react';
 import { ClipboardList, Plus, Search, Shield, Users } from 'lucide-react';
-import { motion } from 'motion/react';
 import { getCopy } from '../lib/i18n';
 import { useFitness } from './FirebaseProvider';
 import type { Discipline, Language, UserRole, UserStatus } from '../types/fitness';
@@ -20,7 +19,6 @@ export const AdminConsoleView: React.FC<{ language: Language }> = ({ language })
   const [subTab, setSubTab] = useState<'users' | 'exercises' | 'audit'>('users');
   const [search, setSearch] = useState('');
 
-  // Official Exercise Publisher
   const [exName, setExName] = useState('');
   const [exNameAr, setExNameAr] = useState('');
   const [exDiscipline, setExDiscipline] = useState<Discipline>('Bodybuilding');
@@ -38,15 +36,15 @@ export const AdminConsoleView: React.FC<{ language: Language }> = ({ language })
 
   if (!user || !isAdmin) {
     return (
-      <div className="glass-panel rounded-[28px] p-8 text-center space-y-4 max-w-xl mx-auto">
-        <Shield className="h-10 w-10 text-amber-300 mx-auto" />
-        <h1 className="text-xl font-bold text-white">{t.admin.title}</h1>
-        <p className="text-sm text-slate-300 leading-relaxed">{t.admin.restricted}</p>
+      <div className="app-card rounded-2xl p-8 text-center space-y-4 max-w-md mx-auto">
+        <Shield className="h-9 w-9 text-amber-400 mx-auto" />
+        <h1 className="text-lg font-bold text-white">{t.admin.title}</h1>
+        <p className="text-xs text-slate-400 leading-relaxed">{t.admin.restricted}</p>
         {!user && (
           <button
             type="button"
             onClick={loginWithGoogle}
-            className="min-h-[44px] px-6 rounded-full bg-gradient-to-r from-amber-300 via-amber-400 to-orange-400 text-slate-950 font-bold text-sm hover:opacity-95 transition-all"
+            className="min-h-[42px] px-5 rounded-xl bg-amber-400 text-slate-950 font-bold text-xs"
           >
             {t.auth.signIn}
           </button>
@@ -77,34 +75,29 @@ export const AdminConsoleView: React.FC<{ language: Language }> = ({ language })
   };
 
   return (
-    <div className="space-y-6">
-      <div className="space-y-1">
-        <h1 className="text-2xl font-bold text-white">{t.admin.title}</h1>
-        <p className="text-sm text-slate-300">{t.admin.subtitle}</p>
-      </div>
-
+    <div className="space-y-4">
       {/* KPI Strip */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="glass-panel rounded-[24px] p-5">
-          <p className="text-xs text-slate-400">{t.admin.totalUsers}</p>
-          <p className="text-2xl font-bold text-white font-mono-tabular mt-1">{allUsers.length}</p>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="app-card rounded-2xl p-4">
+          <p className="text-[11px] text-slate-400">{t.admin.totalUsers}</p>
+          <p className="text-2xl font-extrabold text-white font-mono-tabular mt-1">{allUsers.length}</p>
         </div>
-        <div className="glass-panel rounded-[24px] p-5">
-          <p className="text-xs text-slate-400">{t.admin.activeUsers}</p>
-          <p className="text-2xl font-bold text-amber-300 font-mono-tabular mt-1">{activeCount}</p>
+        <div className="app-card rounded-2xl p-4">
+          <p className="text-[11px] text-slate-400">{t.admin.activeUsers}</p>
+          <p className="text-2xl font-extrabold text-amber-300 font-mono-tabular mt-1">{activeCount}</p>
         </div>
-        <div className="glass-panel rounded-[24px] p-5">
-          <p className="text-xs text-slate-400">{t.admin.suspendedUsers}</p>
-          <p className="text-2xl font-bold text-rose-400 font-mono-tabular mt-1">{suspendedCount}</p>
+        <div className="app-card rounded-2xl p-4">
+          <p className="text-[11px] text-slate-400">{t.admin.suspendedUsers}</p>
+          <p className="text-2xl font-extrabold text-rose-400 font-mono-tabular mt-1">{suspendedCount}</p>
         </div>
-        <div className="glass-panel rounded-[24px] p-5">
-          <p className="text-xs text-slate-400">{t.admin.auditEvents}</p>
-          <p className="text-2xl font-bold text-sky-300 font-mono-tabular mt-1">{auditLogs.length}</p>
+        <div className="app-card rounded-2xl p-4">
+          <p className="text-[11px] text-slate-400">{t.admin.auditEvents}</p>
+          <p className="text-2xl font-extrabold text-sky-300 font-mono-tabular mt-1">{auditLogs.length}</p>
         </div>
       </div>
 
-      {/* Animated Oval Sub-navigation Tabs */}
-      <div className="flex flex-wrap items-center gap-1 rounded-full bg-white/[0.04] p-1 border border-white/10 w-fit">
+      {/* Segmented Admin Tabs */}
+      <div className="grid grid-cols-3 rounded-2xl bg-[#111318] border border-white/[0.08] p-1">
         {[
           { id: 'users' as const, label: t.admin.usersTab, icon: Users },
           { id: 'exercises' as const, label: t.admin.exercisesTab, icon: Plus },
@@ -117,26 +110,19 @@ export const AdminConsoleView: React.FC<{ language: Language }> = ({ language })
               key={tabItem.id}
               type="button"
               onClick={() => setSubTab(tabItem.id)}
-              className={`relative min-h-[40px] px-4 py-1.5 rounded-full text-xs font-semibold inline-flex items-center gap-2 whitespace-nowrap shrink-0 transition-colors ${
-                active ? 'text-slate-950' : 'text-slate-300 hover:text-white'
+              className={`min-h-[40px] px-2 rounded-xl text-xs font-bold inline-flex items-center justify-center gap-1.5 transition-colors ${
+                active ? 'bg-amber-400 text-slate-950' : 'text-slate-300 hover:text-white'
               }`}
             >
-              {active && (
-                <motion.span
-                  layoutId="adminTabOval"
-                  transition={{ type: 'spring', stiffness: 420, damping: 32 }}
-                  className="absolute inset-0 rounded-full bg-gradient-to-r from-amber-300 via-amber-400 to-orange-400"
-                />
-              )}
-              <Icon className="relative z-10 h-4 w-4" />
-              <span className="relative z-10">{tabItem.label}</span>
+              <Icon className="h-3.5 w-3.5 shrink-0" />
+              <span className="truncate">{tabItem.label}</span>
             </button>
           );
         })}
       </div>
 
       {subTab === 'users' && (
-        <section className="glass-panel rounded-2xl p-5 space-y-4">
+        <section className="app-card rounded-2xl p-4 space-y-3.5">
           <div className="relative max-w-sm">
             <Search className="h-4 w-4 text-slate-400 absolute top-1/2 -translate-y-1/2 left-3" />
             <input
@@ -144,48 +130,48 @@ export const AdminConsoleView: React.FC<{ language: Language }> = ({ language })
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder={t.admin.searchUsers}
-              className="min-h-[44px] w-full rounded-xl border border-slate-800 bg-slate-950/80 pl-9 pr-3 text-sm text-white"
+              className="min-h-[42px] w-full rounded-xl border border-white/[0.1] bg-[#0c0e14] pl-9 pr-3 text-xs text-white"
             />
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full text-start border-collapse text-sm">
+            <table className="w-full text-start border-collapse text-xs">
               <thead>
-                <tr className="border-b border-slate-800 text-xs text-slate-400">
-                  <th className="py-3 px-3 text-start font-medium">Athlete</th>
-                  <th className="py-3 px-3 text-start font-medium">Targets</th>
-                  <th className="py-3 px-3 text-start font-medium">{t.admin.role}</th>
-                  <th className="py-3 px-3 text-start font-medium">{t.admin.status}</th>
+                <tr className="border-b border-white/[0.08] text-[11px] text-slate-400">
+                  <th className="py-2.5 px-3 text-start font-semibold">Athlete</th>
+                  <th className="py-2.5 px-3 text-start font-semibold">Targets</th>
+                  <th className="py-2.5 px-3 text-start font-semibold">{t.admin.role}</th>
+                  <th className="py-2.5 px-3 text-start font-semibold">{t.admin.status}</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-800/70">
+              <tbody className="divide-y divide-white/[0.06]">
                 {filteredUsers.map((u) => (
-                  <tr key={u.uid} className="hover:bg-slate-900/40">
-                    <td className="py-3 px-3">
-                      <p className="font-semibold text-white">{u.displayName}</p>
-                      <p className="text-xs font-mono-tabular text-slate-500">{u.uid}</p>
+                  <tr key={u.uid}>
+                    <td className="py-2.5 px-3">
+                      <p className="font-bold text-white">{u.displayName}</p>
+                      <p className="text-[10px] font-mono-tabular text-slate-500">{u.uid.slice(0, 14)}</p>
                     </td>
-                    <td className="py-3 px-3 font-mono-tabular text-xs text-slate-300">
+                    <td dir="ltr" className="py-2.5 px-3 font-mono-tabular text-slate-300">
                       {u.targetCalories} kcal · {u.goal}
                     </td>
-                    <td className="py-3 px-3">
+                    <td className="py-2.5 px-3">
                       <select
                         value={u.role}
                         aria-label={`Role for ${u.displayName}`}
                         onChange={(e) => adminUpdateUser(u.uid, e.target.value as UserRole, u.status)}
-                        className="min-h-[38px] rounded-lg border border-slate-700 bg-slate-950 px-2.5 text-xs text-white"
+                        className="min-h-[34px] rounded-lg border border-white/[0.1] bg-[#0c0e14] px-2 text-xs text-white"
                       >
                         <option value="member">member</option>
                         <option value="coach">coach</option>
                         <option value="admin">admin</option>
                       </select>
                     </td>
-                    <td className="py-3 px-3">
+                    <td className="py-2.5 px-3">
                       <select
                         value={u.status}
                         aria-label={`Status for ${u.displayName}`}
                         onChange={(e) => adminUpdateUser(u.uid, u.role, e.target.value as UserStatus)}
-                        className={`min-h-[38px] rounded-lg border px-2.5 text-xs font-medium ${
+                        className={`min-h-[34px] rounded-lg border px-2 text-xs font-bold ${
                           u.status === 'active'
                             ? 'border-amber-400/40 bg-amber-400/10 text-amber-200'
                             : 'border-rose-500/40 bg-rose-500/10 text-rose-300'
@@ -199,7 +185,7 @@ export const AdminConsoleView: React.FC<{ language: Language }> = ({ language })
                 ))}
                 {filteredUsers.length === 0 && (
                   <tr>
-                    <td colSpan={4} className="py-8 text-center text-xs text-slate-400">
+                    <td colSpan={4} className="py-6 text-center text-xs text-slate-400">
                       No matching users found.
                     </td>
                   </tr>
@@ -211,9 +197,9 @@ export const AdminConsoleView: React.FC<{ language: Language }> = ({ language })
       )}
 
       {subTab === 'exercises' && (
-        <form onSubmit={handlePublish} className="glass-panel rounded-2xl p-6 space-y-4 max-w-2xl">
-          <h2 className="text-base font-bold text-white">{t.admin.publishExercise}</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <form onSubmit={handlePublish} className="app-card rounded-2xl p-4 sm:p-5 space-y-3.5 max-w-2xl">
+          <h2 className="text-sm font-bold text-white">{t.admin.publishExercise}</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
             <input
               type="text"
               required
@@ -222,7 +208,7 @@ export const AdminConsoleView: React.FC<{ language: Language }> = ({ language })
               value={exName}
               onChange={(e) => setExName(e.target.value)}
               placeholder="Exercise Name (EN)"
-              className="min-h-[44px] rounded-xl border border-slate-800 bg-slate-950/80 px-3 text-sm text-white"
+              className="min-h-[42px] rounded-xl border border-white/[0.1] bg-[#0c0e14] px-3 text-xs text-white"
             />
             <input
               type="text"
@@ -232,12 +218,12 @@ export const AdminConsoleView: React.FC<{ language: Language }> = ({ language })
               value={exNameAr}
               onChange={(e) => setExNameAr(e.target.value)}
               placeholder="اسم التمرين (AR)"
-              className="min-h-[44px] rounded-xl border border-slate-800 bg-slate-950/80 px-3 text-sm text-white"
+              className="min-h-[42px] rounded-xl border border-white/[0.1] bg-[#0c0e14] px-3 text-xs text-white"
             />
             <select
               value={exDiscipline}
               onChange={(e) => setExDiscipline(e.target.value as Discipline)}
-              className="min-h-[44px] rounded-xl border border-slate-800 bg-slate-950/80 px-3 text-sm text-white"
+              className="min-h-[42px] rounded-xl border border-white/[0.1] bg-[#0c0e14] px-3 text-xs text-white"
             >
               <option value="Bodybuilding">Bodybuilding</option>
               <option value="Calisthenics">Calisthenics</option>
@@ -249,16 +235,16 @@ export const AdminConsoleView: React.FC<{ language: Language }> = ({ language })
               required
               value={exMuscle}
               onChange={(e) => setExMuscle(e.target.value)}
-              placeholder="Muscle Group (e.g., Chest, Back)"
-              className="min-h-[44px] rounded-xl border border-slate-800 bg-slate-950/80 px-3 text-sm text-white"
+              placeholder="Muscle Group"
+              className="min-h-[42px] rounded-xl border border-white/[0.1] bg-[#0c0e14] px-3 text-xs text-white"
             />
             <input
               type="text"
               required
               value={exEquipment}
               onChange={(e) => setExEquipment(e.target.value)}
-              placeholder="Equipment (e.g., Barbell, Rings)"
-              className="sm:col-span-2 min-h-[44px] rounded-xl border border-slate-800 bg-slate-950/80 px-3 text-sm text-white"
+              placeholder="Equipment"
+              className="sm:col-span-2 min-h-[42px] rounded-xl border border-white/[0.1] bg-[#0c0e14] px-3 text-xs text-white"
             />
           </div>
           <textarea
@@ -269,35 +255,35 @@ export const AdminConsoleView: React.FC<{ language: Language }> = ({ language })
             value={exInstructions}
             onChange={(e) => setExInstructions(e.target.value)}
             placeholder="Form and execution cues..."
-            className="w-full rounded-xl border border-slate-800 bg-slate-950/80 p-3 text-sm text-white"
+            className="w-full rounded-xl border border-white/[0.1] bg-[#0c0e14] p-3 text-xs text-white"
           />
           <button
             type="submit"
-            className="min-h-[44px] px-6 rounded-full bg-gradient-to-r from-amber-300 via-amber-400 to-orange-400 text-slate-950 text-sm font-bold hover:opacity-95 transition-all"
+            className="min-h-[42px] px-5 rounded-xl bg-amber-400 text-slate-950 text-xs font-extrabold"
           >
             {t.admin.publishExercise}
           </button>
           {publishedToast && (
-            <p className="text-xs text-amber-300 font-medium">Exercise published globally to ELARB catalog.</p>
+            <p className="text-xs text-amber-300 font-semibold">Exercise published to global catalog.</p>
           )}
         </form>
       )}
 
       {subTab === 'audit' && (
-        <section className="glass-panel rounded-2xl divide-y divide-slate-800/80">
+        <section className="app-list-group divide-y divide-white/[0.07]">
           {auditLogs.map((log) => (
-            <div key={log.id} className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+            <div key={log.id} className="p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
               <div>
-                <p className="font-semibold text-white">{log.action}</p>
+                <p className="font-bold text-white">{log.action}</p>
                 <p className="text-slate-400">{log.details}</p>
               </div>
-              <span className="font-mono-tabular text-slate-500">
-                Actor: {log.actorUid.slice(0, 10)} · Target: {log.targetId.slice(0, 10)}
+              <span dir="ltr" className="font-mono-tabular text-[11px] text-slate-500">
+                {log.actorUid.slice(0, 10)} → {log.targetId.slice(0, 10)}
               </span>
             </div>
           ))}
           {auditLogs.length === 0 && (
-            <p className="p-6 text-center text-xs text-slate-400">No compliance audit events recorded yet.</p>
+            <p className="p-6 text-center text-xs text-slate-400">No audit events yet.</p>
           )}
         </section>
       )}

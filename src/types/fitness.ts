@@ -5,7 +5,7 @@ export type FitnessGoal = 'cut' | 'maintain' | 'bulk';
 export type ActivityLevel = 'sedentary' | 'light' | 'moderate' | 'active' | 'athlete';
 export type Discipline = 'Bodybuilding' | 'Calisthenics' | 'CrossFit' | 'HIIT';
 export type MealType = 'Breakfast' | 'Lunch' | 'Dinner' | 'Snack';
-export type AppTab = 'overview' | 'workouts' | 'nutrition' | 'progress' | 'compliance' | 'admin';
+export type AppTab = 'overview' | 'workouts' | 'nutrition' | 'progress' | 'league' | 'compliance' | 'admin';
 
 export interface UserProfile {
   uid: string;
@@ -205,6 +205,32 @@ export interface FoodAnalysisResult {
     carbsG: number;
     fatsG: number;
   }>;
+}
+
+export interface SoloLeagueEntry {
+  uid: string;
+  displayName: string;
+  score: number;
+  workoutsCount: number;
+  prsCount: number;
+  updatedAt?: unknown;
+}
+
+export interface FriendContact {
+  uid: string;
+  displayName: string;
+  addedAt?: unknown;
+}
+
+export interface DirectMessage {
+  id: string;
+  participants: string[];
+  senderUid: string;
+  senderName: string;
+  receiverUid: string;
+  receiverName: string;
+  message: string;
+  createdAt?: unknown;
 }
 
 export interface AiWorkoutPlan {

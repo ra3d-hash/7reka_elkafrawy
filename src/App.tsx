@@ -8,11 +8,14 @@ import {
   LogOut,
   Shield,
   ShieldCheck,
+  Trophy,
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { AdminConsoleView } from './components/AdminConsoleView';
 import { ComplianceSettingsView } from './components/ComplianceSettingsView';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { FirebaseProvider, useFitness } from './components/FirebaseProvider';
+import { GymLeagueView } from './components/GymLeagueView';
 import { MandatoryAuthAndOnboarding } from './components/MandatoryAuthAndOnboarding';
 import { NutritionScannerView } from './components/NutritionScannerView';
 import { OfflineIndicator } from './components/OfflineIndicator';
@@ -21,15 +24,17 @@ import { ProgressAnalyticsView } from './components/ProgressAnalyticsView';
 import { PWAInstallButton } from './components/PWAInstallButton';
 import { WorkoutsView } from './components/WorkoutsView';
 import { getCopy } from './lib/i18n';
+import { MEDIA_ASSETS } from './lib/mediaAssets';
 import type { AppTab, Language } from './types/fitness';
 
 const TAB_BACKDROPS: Record<AppTab, string> = {
-  overview: '/src/assets/images/bg_obsidian_club_1794753821831.jpg',
-  workouts: '/src/assets/images/bg_performance_athlete_1794753828001.jpg',
-  nutrition: '/src/assets/images/bg_nutrition_culinary_1794753823677.jpg',
-  progress: '/src/assets/images/bg_recovery_lounge_1794753825056.jpg',
-  compliance: '/src/assets/images/bg_recovery_lounge_1794753825056.jpg',
-  admin: '/src/assets/images/bg_obsidian_club_1794753821831.jpg',
+  overview: MEDIA_ASSETS.bgObsidianClub,
+  workouts: MEDIA_ASSETS.bgPerformanceAthlete,
+  nutrition: MEDIA_ASSETS.bgNutritionCulinary,
+  progress: MEDIA_ASSETS.bgRecoveryLounge,
+  league: MEDIA_ASSETS.bgPerformanceAthlete,
+  compliance: MEDIA_ASSETS.bgRecoveryLounge,
+  admin: MEDIA_ASSETS.bgObsidianClub,
 };
 
 const FitProShell: React.FC = () => {
@@ -37,6 +42,7 @@ const FitProShell: React.FC = () => {
   const [activeTab, setActiveTab] = useState<AppTab>('overview');
   const {
     user,
+    emailUnverified,
     authReady,
     profileLoaded,
     needsOnboarding,
@@ -52,7 +58,7 @@ const FitProShell: React.FC = () => {
   const t = getCopy(language);
   const isRtl = language === 'ar';
 
-  if (!authReady || (user && !profileLoaded)) {
+  if (!authReady || (user && user.emailVerified && !profileLoaded)) {
     return (
       <div
         dir={isRtl ? 'rtl' : 'ltr'}
@@ -66,7 +72,7 @@ const FitProShell: React.FC = () => {
     );
   }
 
-  if (!user || needsOnboarding) {
+  if (!user || emailUnverified || needsOnboarding) {
     return <MandatoryAuthAndOnboarding language={language} onChangeLanguage={setLanguage} />;
   }
 
@@ -75,6 +81,7 @@ const FitProShell: React.FC = () => {
     { id: 'workouts', label: t.nav.workouts, icon: Dumbbell },
     { id: 'nutrition', label: t.nav.nutrition, icon: Camera },
     { id: 'progress', label: t.nav.progress, icon: BarChart3 },
+    { id: 'league', label: t.nav.league, icon: Trophy },
     { id: 'compliance', label: t.nav.compliance, icon: ShieldCheck },
     ...(isAdmin ? [{ id: 'admin' as AppTab, label: t.nav.admin, icon: Shield }] : []),
   ];
@@ -233,6 +240,7 @@ const FitProShell: React.FC = () => {
             {activeTab === 'workouts' && <WorkoutsView language={language} />}
             {activeTab === 'nutrition' && <NutritionScannerView language={language} />}
             {activeTab === 'progress' && <ProgressAnalyticsView language={language} />}
+            {activeTab === 'league' && <GymLeagueView language={language} />}
             {activeTab === 'compliance' && <ComplianceSettingsView language={language} />}
             {activeTab === 'admin' && <AdminConsoleView language={language} />}
           </motion.div>
@@ -276,7 +284,7 @@ const FitProShell: React.FC = () => {
       >
         <div
           className={`pointer-events-auto mx-auto max-w-md rounded-full glass-capsule p-1.5 grid items-center ${
-            isAdmin ? 'grid-cols-6' : 'grid-cols-5'
+            isAdmin ? 'grid-cols-7' : 'grid-cols-6'
           }`}
         >
           {navItems.map((item) => {
@@ -315,8 +323,10 @@ const FitProShell: React.FC = () => {
 
 export default function App() {
   return (
-    <FirebaseProvider>
-      <FitProShell />
-    </FirebaseProvider>
+    <ErrorBoundary>
+      <FirebaseProvider>
+        <FitProShell />
+      </FirebaseProvider>
+    </ErrorBoundary>
   );
 }

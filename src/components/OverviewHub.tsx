@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { useFitness } from './FirebaseProvider';
 import { getCopy } from '../lib/i18n';
+import { MEDIA_ASSETS } from '../lib/mediaAssets';
 import { READY_TRAINING_PROGRAMS } from '../data/programs';
 import { READY_DIET_PLANS } from '../data/diets';
 import type { AppTab, Language } from '../types/fitness';
@@ -98,7 +99,7 @@ export const OverviewHub: React.FC<OverviewHubProps> = ({ language, onNavigate }
 
           <div className="lg:col-span-5 relative min-h-[250px] lg:min-h-[340px] bg-black/60 overflow-hidden">
             <img
-              src="/src/assets/images/hero_gym_studio_1794750798669.jpg"
+              src={MEDIA_ASSETS.heroGymStudio}
               alt="ELARB FitPro Ultra training facility"
               referrerPolicy="no-referrer"
               className="h-full w-full object-cover"
